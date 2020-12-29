@@ -31,7 +31,7 @@ class MyWidget extends StatefulWidget {
 
 class _MyWidgetState extends State<MyWidget> {
   TextEditingController _c = new TextEditingController();
-  double budget;
+  double budget = 0.0;
   Widget build(BuildContext context) {
     return buildWidgets(context, _c);
   }
@@ -211,8 +211,9 @@ class _MyWidgetState extends State<MyWidget> {
   }
 
   Widget budgetText() {
+    String _budgetString = "\$" + budget.toStringAsFixed(2);
     return Text(
-      "\$" + budget.toStringAsFixed(2),
+      _budgetString,
       style: TextStyle(
         fontWeight: FontWeight.bold,
         fontSize: 40,
