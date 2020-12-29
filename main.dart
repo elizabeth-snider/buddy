@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
           appBar: AppBar(
             title: Text('welcome to budge'),
           ),
-          body: MyWidget(),
+          body: BothPages(),
         ));
   }
 }
@@ -232,5 +233,48 @@ class _MyWidgetState extends State<MyWidget> {
     setState(() {
       budget = (prefs.getDouble('total') ?? 0);
     });
+  }
+}
+
+
+class BothPages extends StatefulWidget {
+  @override
+  _BothPagesState createState() => _BothPagesState();
+}
+
+class _BothPagesState extends State<BothPages> {
+  int _currentPage = 0;
+
+  static List<Widget> _bothPages = <Widget>[
+    MyWidget(),
+    Text("put 2nd page here"),
+  ];
+
+  void _onItemTapped(int index){
+    setState(() {
+      _currentPage = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: _bothPages[_currentPage],
+      bottomNavigationBar: BottomNavigationBar(
+        items: [
+          new BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: "Main"
+          ),
+          new BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: "History"
+          ),
+        ],
+        currentIndex: _currentPage,
+        selectedItemColor: Colors.black,
+        onTap: _onItemTapped,
+        ),
+    );
   }
 }
