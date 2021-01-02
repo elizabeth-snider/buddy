@@ -1,9 +1,12 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'data.dart';
+import 'package:path/path.dart';
+import 'package:budget/models/transaction.dart';
 
-void main() {
+void main() async{
   runApp(MyApp());
 }
 
@@ -23,6 +26,7 @@ class MyApp extends StatelessWidget {
         ));
   }
 }
+
 
 class MyWidget extends StatefulWidget {
   @override
@@ -53,7 +57,7 @@ class _MyWidgetState extends State<MyWidget> {
             )),
         row(context, _c),
         Container(
-            height: 100,
+            height: 80,
             child: Align(
                 alignment: Alignment.bottomCenter,
                 child: originalButton(context, _c))),
@@ -161,6 +165,9 @@ class _MyWidgetState extends State<MyWidget> {
                                 budget = budget + double.parse(_c.text);
                                 addBudgetToSF();
                               });
+
+                              var newTransaction = Transactions(val: _c.text,category: 'idk yet' );
+                              DBProvider.db.newTransaction(newTransaction);
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -196,10 +203,16 @@ class _MyWidgetState extends State<MyWidget> {
                         RaisedButton(
                             child: new Text("enter"),
                             onPressed: () {
+
                               setState(() {
                                 budget = double.parse(_c.text);
                                 addBudgetToSF();
                               });
+                              
+                              var newTransaction = Transactions(val: _c.text,category: 'idk yet' );
+                              DBProvider.db.newTransaction(newTransaction);
+
+                  
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -237,6 +250,62 @@ class _MyWidgetState extends State<MyWidget> {
   }
 }
 
+class HistoryPage extends StatefulWidget {
+  @override
+  _HistoryPageState createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends State<HistoryPage> {
+
+  Map<String, String> newTransaction = {};
+
+  Future _transactionFuture;
+
+  @override
+  void initState(){
+    super.initState();
+    _transactionFuture = getTransactions();
+  }
+  getTransactions() async{
+    final _transdata = await DBProvider.db.getCat();
+    return _transdata;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        body: FutureBuilder(
+        future: _transactionFuture, 
+        builder: (_, transData){
+          switch(transData.connectionState){
+            case ConnectionState.none:
+              return Container();
+            case ConnectionState.waiting:
+              return Container();
+            case ConnectionState.active:
+              return Container();
+            case ConnectionState.done:
+              if(!newTransaction.containsKey('category')){
+                newTransaction = Map<String, String>.from(transData.data);
+              }
+              return Column(children: <Widget>[
+                Text(
+                  newTransaction['category'],
+                  ),
+                Text(
+                  newTransaction['val'],
+                )
+                  ]);
+          }
+          return Container();
+        }
+      )
+    );
+  }
+}
+
+
+
 
 class BothPages extends StatefulWidget {
   @override
@@ -248,7 +317,7 @@ class _BothPagesState extends State<BothPages> {
 
   static List<Widget> _bothPages = <Widget>[
     MyWidget(),
-    Text("put 2nd page here"),
+    HistoryPage(),
   ];
 
   void _onItemTapped(int index){
