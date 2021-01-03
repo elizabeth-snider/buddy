@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart';
 import 'data.dart';
-import 'package:path/path.dart';
 import 'package:budget/models/transaction.dart';
 
 void main() async{
@@ -36,6 +34,8 @@ class MyWidget extends StatefulWidget {
 class _MyWidgetState extends State<MyWidget> {
   TextEditingController _c = new TextEditingController();
   double budget = 0.0;
+  int spot = 0;
+
   Widget build(BuildContext context) {
     return buildWidgets(context, _c);
   }
@@ -120,7 +120,11 @@ class _MyWidgetState extends State<MyWidget> {
                               setState(() {
                                 budget = budget - double.parse(_c.text);
                                 addBudgetToSF();
+                                loadSpot();
                               });
+                              var newTransaction = Transactions(id: 1,val: _c.text,category: 'category name would go here' );
+                              DBProvider.db.newTransaction(newTransaction);
+
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -164,10 +168,11 @@ class _MyWidgetState extends State<MyWidget> {
                               setState(() {
                                 budget = budget + double.parse(_c.text);
                                 addBudgetToSF();
+                                loadSpot();
                               });
-
-                              var newTransaction = Transactions(val: _c.text,category: 'idk yet' );
+                              var newTransaction = Transactions(id: 2, val: _c.text,category: 'category name would go here');
                               DBProvider.db.newTransaction(newTransaction);
+
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -208,11 +213,7 @@ class _MyWidgetState extends State<MyWidget> {
                                 budget = double.parse(_c.text);
                                 addBudgetToSF();
                               });
-                              
-                              var newTransaction = Transactions(val: _c.text,category: 'idk yet' );
-                              DBProvider.db.newTransaction(newTransaction);
 
-                  
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -247,6 +248,12 @@ class _MyWidgetState extends State<MyWidget> {
     setState(() {
       budget = (prefs.getDouble('total') ?? 0);
     });
+  }
+
+  loadSpot() async{
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int spot = prefs.getKeys().length;
+    prefs.setInt(spot.toString(), spot);
   }
 }
 

@@ -18,11 +18,11 @@ class DBProvider{
 
   initDB() async{
     return await openDatabase(
-      join(await getDatabasesPath(), 'transaction_history.db'),
+      join(await getDatabasesPath(), 'transactions.db'),
       onCreate: (db, version) async {
         await db.execute('''
-          CREATE TABLE transaction_table(
-            category TEXT, val TEXT
+          CREATE TABLE transactions(
+            id INTEGER PRIMARY KEY, category TEXT, val TEXT
           )
         ''');
       },
@@ -35,17 +35,17 @@ class DBProvider{
 
     var res = await db.rawInsert(
       '''
-      INSERT INTO transaction_table (
-        category, val
-      ) VALUES (?, ?)
-      ''', [newTransaction.category, newTransaction.val]
+      INSERT INTO transactions (
+        id, category, val
+      ) VALUES (?, ?, ?)
+      ''', [newTransaction.id, newTransaction.category, newTransaction.val]
     );
     return res;
   }
 
   Future<dynamic> getCat() async{
     final db = await database;
-    var res = await db.query("transaction_table");
+    var res = await db.query("transactions");
     if(res.length == 0){
       return null;
     } else{
