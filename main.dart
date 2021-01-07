@@ -1,10 +1,10 @@
+import 'package:budget/dataHelper.dart';
+import 'package:budget/transactionCLASS.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'data.dart';
-import 'package:budget/models/transaction.dart';
 
-void main() async{
+void main() {
   runApp(MyApp());
 }
 
@@ -25,8 +25,8 @@ class MyApp extends StatelessWidget {
   }
 }
 
-
 class MyWidget extends StatefulWidget {
+
   @override
   _MyWidgetState createState() => _MyWidgetState();
 }
@@ -34,20 +34,35 @@ class MyWidget extends StatefulWidget {
 class _MyWidgetState extends State<MyWidget> {
   TextEditingController _c = new TextEditingController();
   double budget = 0.0;
-  int spot = 0;
+  var dbHelper;
+  Future<List<TransactionClass>> allTransactions;
+  String name;
+
+  
+  refreshList() {
+    setState((){
+      allTransactions = dbHelper.getTransactions();
+    });
+  }
+  
+  @override
+  void initState() {
+    super.initState();
+    loadBudget();
+    dbHelper = DBHelper();
+    //refreshList(); 
+  }
+  
+
+  
 
   Widget build(BuildContext context) {
     return buildWidgets(context, _c);
   }
 
-  @override
-  void initState() {
-    super.initState();
-    loadBudget();
-  }
-
   Widget buildWidgets(context, _c) {
-    return Column(
+    return SingleChildScrollView(
+      child: Column(
       children: [
         Container(
             height: 100,
@@ -61,7 +76,8 @@ class _MyWidgetState extends State<MyWidget> {
             child: Align(
                 alignment: Alignment.bottomCenter,
                 child: originalButton(context, _c))),
-      ],
+        ],
+      )
     );
   }
 
@@ -117,14 +133,14 @@ class _MyWidgetState extends State<MyWidget> {
                         RaisedButton(
                             child: new Text("enter"),
                             onPressed: () {
+                              double change = -double.parse(_c.text);
+                              TransactionClass t = TransactionClass(null, 'category name', change);
+                              dbHelper.save(t);
+                              refreshList(); 
                               setState(() {
-                                budget = budget - double.parse(_c.text);
+                                budget = budget + change;
                                 addBudgetToSF();
-                                loadSpot();
                               });
-                              var newTransaction = Transactions(id: 1,val: _c.text,category: 'category name would go here' );
-                              DBProvider.db.newTransaction(newTransaction);
-
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -165,14 +181,14 @@ class _MyWidgetState extends State<MyWidget> {
                         RaisedButton(
                             child: new Text("enter"),
                             onPressed: () {
+                              double change = double.parse(_c.text);
+                              TransactionClass t = TransactionClass(null, 'category name', change);
+                              dbHelper.save(t);
+                              refreshList(); 
                               setState(() {
-                                budget = budget + double.parse(_c.text);
+                                budget = budget + change;
                                 addBudgetToSF();
-                                loadSpot();
                               });
-                              var newTransaction = Transactions(id: 2, val: _c.text,category: 'category name would go here');
-                              DBProvider.db.newTransaction(newTransaction);
-
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -208,12 +224,12 @@ class _MyWidgetState extends State<MyWidget> {
                         RaisedButton(
                             child: new Text("enter"),
                             onPressed: () {
-
+                              dbHelper.deleteAll();
+                              refreshList();
                               setState(() {
                                 budget = double.parse(_c.text);
                                 addBudgetToSF();
                               });
-
                               Navigator.pop(context);
                               _c.clear();
                             }),
@@ -249,68 +265,97 @@ class _MyWidgetState extends State<MyWidget> {
       budget = (prefs.getDouble('total') ?? 0);
     });
   }
-
-  loadSpot() async{
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    int spot = prefs.getKeys().length;
-    prefs.setInt(spot.toString(), spot);
-  }
 }
 
-class HistoryPage extends StatefulWidget {
+mixin Alignmnent {
+}
+
+class DataPage extends StatefulWidget {
   @override
-  _HistoryPageState createState() => _HistoryPageState();
+  _DataPageState createState() => _DataPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _DataPageState extends State<DataPage> {
 
-  Map<String, String> newTransaction = {};
-
-  Future _transactionFuture;
+  Future<List<TransactionClass>> allTransactions;
+  var dbHelper;
 
   @override
   void initState(){
     super.initState();
-    _transactionFuture = getTransactions();
-  }
-  getTransactions() async{
-    final _transdata = await DBProvider.db.getCat();
-    return _transdata;
+    dbHelper = DBHelper();
+    refreshList();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-        body: FutureBuilder(
-        future: _transactionFuture, 
-        builder: (_, transData){
-          switch(transData.connectionState){
-            case ConnectionState.none:
-              return Container();
-            case ConnectionState.waiting:
-              return Container();
-            case ConnectionState.active:
-              return Container();
-            case ConnectionState.done:
-              if(!newTransaction.containsKey('category')){
-                newTransaction = Map<String, String>.from(transData.data);
-              }
-              return Column(children: <Widget>[
-                Text(
-                  newTransaction['category'],
-                  ),
-                Text(
-                  newTransaction['val'],
-                )
-                  ]);
-          }
-          return Container();
-        }
+  refreshList() {
+    setState((){
+      allTransactions = dbHelper.getTransactions();
+    });
+  }
+
+  SingleChildScrollView dataTable(List <TransactionClass> transactions){
+    return SingleChildScrollView(
+      scrollDirection: Axis.vertical,
+      child: DataTable(
+        columns: [
+          DataColumn(
+            label: Text('Category')
+          ),
+          DataColumn(
+            label: Text('Amount')
+          ),
+        ],
+        rows: transactions
+          .map(
+            (transaction) => DataRow( cells: 
+                      [
+                        DataCell(
+                          Text(transaction.category)
+                        ),
+                        DataCell(
+                          Text(transaction.val.toString())
+                        ),
+                      ]
+            )
+          ).toList()
+        ,
       )
     );
   }
-}
 
+  list(){
+    return Expanded(
+      child: FutureBuilder(
+        future: allTransactions,
+        builder: (context, snapshot){
+          
+          if (null == snapshot.data || snapshot.data.length == 0){
+            return Text('No Transactions');
+          }
+
+          else if(snapshot.hasData){
+            return dataTable(snapshot.data);
+
+            }
+          return CircularProgressIndicator();
+          }
+        ),
+    );
+  }
+
+
+
+  @override
+  Widget build(BuildContext context) {
+
+    return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        verticalDirection: VerticalDirection.down,
+        children: <Widget>[list()],
+      );
+  }
+}
 
 
 
@@ -324,7 +369,7 @@ class _BothPagesState extends State<BothPages> {
 
   static List<Widget> _bothPages = <Widget>[
     MyWidget(),
-    HistoryPage(),
+    DataPage(),
   ];
 
   void _onItemTapped(int index){
@@ -335,6 +380,7 @@ class _BothPagesState extends State<BothPages> {
 
   @override
   Widget build(BuildContext context) {
+    //369 MaterialApp is new line maybe bad lol
     return Scaffold(
       body: _bothPages[_currentPage],
       bottomNavigationBar: BottomNavigationBar(
