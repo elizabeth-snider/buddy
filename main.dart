@@ -1,8 +1,15 @@
-import 'package:budget/dataHelper.dart';
-import 'package:budget/transactionCLASS.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:core';
+import 'dart:convert';
+import 'package:cupertino_icons/cupertino_icons.dart';
+import 'dataHelper.dart';
+import 'transactionCLASS.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 void main() {
   runApp(MyApp());
@@ -11,73 +18,109 @@ void main() {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-        theme: new ThemeData(primaryColor: Colors.white),
-        debugShowCheckedModeBanner: false,
-        title: 'welcome to budge',
-        home: Scaffold(
-          resizeToAvoidBottomInset: false,
-          appBar: AppBar(
-            title: Text('welcome to budge'),
-          ),
-          body: BothPages(),
-        ));
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    return CupertinoApp(
+      localizationsDelegates: [
+        DefaultMaterialLocalizations.delegate,
+        DefaultWidgetsLocalizations.delegate,
+        DefaultCupertinoLocalizations.delegate,
+      ],
+      debugShowCheckedModeBanner: false,
+      home: Default(),
+    );
   }
 }
 
-class MyWidget extends StatefulWidget {
-
+class Default extends StatelessWidget {
   @override
-  _MyWidgetState createState() => _MyWidgetState();
+  Widget build(BuildContext context) {
+    return CupertinoTabScaffold(
+        tabBar: CupertinoTabBar(
+          items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.home)),
+            BottomNavigationBarItem(icon: Icon(CupertinoIcons.clock)),
+          ],
+        ),
+        tabBuilder: (context, index) {
+          CupertinoTabView returnValue;
+          switch (index) {
+            case 0:
+              returnValue = CupertinoTabView(builder: (context) {
+                return CupertinoPageScaffold(
+                  child: HomePage(),
+                );
+              });
+              break;
+            case 1:
+              returnValue = CupertinoTabView(builder: (context) {
+                return CupertinoPageScaffold(
+                  child: HistoryPage(),
+                );
+              });
+          }
+          return returnValue;
+        });
+  }
 }
 
-class _MyWidgetState extends State<MyWidget> {
+class HomePage extends StatefulWidget {
+  @override
+  _HomePageState createState() {
+    return _HomePageState();
+  }
+}
+
+class _HomePageState extends State<HomePage>
+    with SingleTickerProviderStateMixin {
   TextEditingController _c = new TextEditingController();
   double budget = 0.0;
+  int spot = 0;
+  AnimationController _ac;
   var dbHelper;
   Future<List<TransactionClass>> allTransactions;
   String name;
+  String cat;
 
-  
   refreshList() {
-    setState((){
+    setState(() {
       allTransactions = dbHelper.getTransactions();
     });
   }
-  
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: widgets(context, _c),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     loadBudget();
     dbHelper = DBHelper();
-    //refreshList(); 
-  }
-  
-
-  
-
-  Widget build(BuildContext context) {
-    return buildWidgets(context, _c);
+    _ac = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 500),
+    );
   }
 
-  Widget buildWidgets(context, _c) {
-    return SingleChildScrollView(
-      child: Column(
+  Widget widgets(context, _c) {
+    return Column(
       children: [
         Container(
-            height: 100,
+            height: 200,
             child: Align(
               alignment: Alignment.center,
               child: budgetText(),
             )),
         row(context, _c),
         Container(
-            height: 80,
+            height: 200,
             child: Align(
                 alignment: Alignment.bottomCenter,
                 child: originalButton(context, _c))),
-        ],
-      )
+      ],
     );
   }
 
@@ -93,7 +136,7 @@ class _MyWidgetState extends State<MyWidget> {
             )),
         Container(
             width: 200,
-            height: 350,
+            height: 250,
             child: Align(
               alignment: Alignment.center,
               child: addButton(context, _c),
@@ -103,141 +146,263 @@ class _MyWidgetState extends State<MyWidget> {
   }
 
   Widget expenseButton(context, _c) {
-    return Material(
-        child: Center(
-            child: Ink(
-      decoration: ShapeDecoration(
-        color: Colors.red,
-        shape: CircleBorder(),
-      ),
-      child: IconButton(
-          alignment: Alignment.center,
-          icon: Icon(Icons.minimize),
-          color: Colors.black,
-          onPressed: () {
-            showDialog(
-                child: new Dialog(
-                    insetPadding: EdgeInsets.all(70),
-                    child: new Column(
-                      children: <Widget>[
-                        new TextField(
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                              hintText: 'enter your expense here'),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: <TextInputFormatter>[
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          controller: _c,
-                        ),
-                        RaisedButton(
-                            child: new Text("enter"),
-                            onPressed: () {
-                              double change = -double.parse(_c.text);
-                              TransactionClass t = TransactionClass(null, 'category name', change);
-                              dbHelper.save(t);
-                              refreshList(); 
-                              setState(() {
-                                budget = budget + change;
-                                addBudgetToSF();
-                              });
-                              Navigator.pop(context);
-                              _c.clear();
-                            }),
-                      ],
-                    )),
-                context: context);
-          }),
-    )));
+    return CupertinoButton(
+        child: Icon(CupertinoIcons.minus),
+        onPressed: () {
+          showCupertinoDialog(
+              context: context,
+              builder: (
+                BuildContext context,
+              ) =>
+                  CupertinoPopupSurface(
+                      //isSurfacePainted: false,
+                      child: Center(
+                          child: Container(
+                              height: 300,
+                              width: 300,
+                              child: Center(
+                                  child: Column(
+                                children: <Widget>[
+                                  new CupertinoTextField(
+                                    padding: EdgeInsets.all(2),
+                                    textAlign: TextAlign.center,
+                                    keyboardType: TextInputType.number,
+                                    controller: _c,
+                                  ),
+                                  categories(context),
+                                  CupertinoButton.filled(
+                                      child: new Text("enter"),
+                                      onPressed: () {
+                                        double change = -double.parse(_c.text);
+                                        TransactionClass t =
+                                            TransactionClass(null, cat, change);
+                                        setState(() {
+                                          budget = budget + change;
+                                          addBudgetToSP();
+                                          dbHelper.save(t);
+                                        });
+                                        refreshList();
+                                        Navigator.of(context,
+                                                rootNavigator: true)
+                                            .pop();
+                                        _c.clear();
+                                      }),
+                                ],
+                              ))))));
+        });
   }
 
   Widget addButton(context, _c) {
-    return Material(
-        child: Center(
-            child: Ink(
-      decoration: ShapeDecoration(
-        color: Colors.lightGreen,
-        shape: CircleBorder(),
-      ),
-      child: IconButton(
-          icon: Icon(Icons.add),
-          color: Colors.black,
-          onPressed: () {
-            showDialog(
-                child: new Dialog(
-                    insetPadding: EdgeInsets.all(70),
-                    child: new Column(
-                      children: <Widget>[
-                        new TextField(
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                              hintText: 'enter your expense here'),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: <TextInputFormatter>[
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          controller: _c,
-                        ),
-                        RaisedButton(
-                            child: new Text("enter"),
-                            onPressed: () {
-                              double change = double.parse(_c.text);
-                              TransactionClass t = TransactionClass(null, 'category name', change);
-                              dbHelper.save(t);
-                              refreshList(); 
-                              setState(() {
-                                budget = budget + change;
-                                addBudgetToSF();
-                              });
-                              Navigator.pop(context);
-                              _c.clear();
-                            }),
-                      ],
-                    )),
-                context: context);
-          }),
-    )));
+    return CupertinoButton(
+        child: Icon(CupertinoIcons.add),
+        onPressed: () {
+          showCupertinoDialog(
+              context: context,
+              builder: (
+                BuildContext context,
+              ) =>
+                  CupertinoPopupSurface(
+                      //isSurfacePainted: false,
+                      child: Center(
+                          child: Container(
+                              height: 300,
+                              width: 300,
+                              child: Center(
+                                  child: Column(
+                                children: <Widget>[
+                                  new CupertinoTextField(
+                                    padding: EdgeInsets.all(2),
+                                    textAlign: TextAlign.center,
+                                    keyboardType: TextInputType.number,
+                                    controller: _c,
+                                  ),
+                                  categories(context),
+                                  CupertinoButton.filled(
+                                      child: new Text("enter"),
+                                      onPressed: () {
+                                        double change = double.parse(_c.text);
+                                        TransactionClass t =
+                                            TransactionClass(null, cat, change);
+                                        setState(() {
+                                          budget = budget + change;
+                                          addBudgetToSP();
+                                          dbHelper.save(t);
+                                        });
+                                        refreshList();
+                                        Navigator.of(context,
+                                                rootNavigator: true)
+                                            .pop();
+                                        _c.clear();
+                                      }),
+                                ],
+                              ))))));
+        });
   }
 
   Widget originalButton(context, _c) {
-    return RaisedButton(
-        textColor: Colors.black,
+    return CupertinoButton.filled(
+        borderRadius: const BorderRadius.all(Radius.circular(10)),
         child: const Text('enter your budget here'),
         onPressed: () {
-          setState(() {
-            showDialog(
-                child: new Dialog(
-                    insetPadding: EdgeInsets.all(70),
-                    child: new Column(
-                      children: <Widget>[
-                        new TextField(
-                          textAlign: TextAlign.center,
-                          decoration: InputDecoration(
-                              border: UnderlineInputBorder(),
-                              hintText: 'enter your budget here'),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: <TextInputFormatter>[
-                            FilteringTextInputFormatter.digitsOnly
-                          ],
-                          controller: _c,
-                        ),
-                        RaisedButton(
-                            child: new Text("enter"),
-                            onPressed: () {
-                              dbHelper.deleteAll();
-                              refreshList();
-                              setState(() {
-                                budget = double.parse(_c.text);
-                                addBudgetToSF();
-                              });
-                              Navigator.pop(context);
-                              _c.clear();
-                            }),
-                      ],
-                    )),
-                context: context);
-          });
+          showCupertinoDialog(
+              context: context,
+              builder: (
+                BuildContext context,
+              ) =>
+                  CupertinoPopupSurface(
+                      //isSurfacePainted: false,
+                      child: Center(
+                          child: Container(
+                              height: 300,
+                              width: 300,
+                              child: Center(
+                                  child: Column(
+                                children: [
+                                  CupertinoTextField(
+                                    padding: EdgeInsets.all(2),
+                                    textAlign: TextAlign.center,
+                                    keyboardType: TextInputType.number,
+                                    controller: _c,
+                                  ),
+                                  CupertinoButton.filled(
+                                      child: new Text("enter"),
+                                      onPressed: () {
+                                        setState(() {
+                                          budget = double.parse(_c.text);
+                                          addBudgetToSP();
+                                          dbHelper.deleteAll();
+                                        });
+                                        refreshList();
+                                        Navigator.of(context,
+                                                rootNavigator: true)
+                                            .pop();
+                                        _c.clear();
+                                      }),
+                                ],
+                              ))))));
         });
+  }
+
+  Widget categories(context) {
+    bool pressed = false;
+    return Column(children: [
+      Row(
+        children: [
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.utensils),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "food/drinks";
+                        });
+                      }))),
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.shoppingBasket),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "groceries";
+                        });
+                      }))),
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.tshirt),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "clothing";
+                        });
+                      }))),
+        ],
+      ),
+      Row(
+        children: [
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.fileInvoiceDollar),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "bills";
+                        });
+                      }))),
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.firstAid),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "health";
+                        });
+                      }))),
+          Expanded(
+              child: Material(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.all(Radius.circular(6)),
+                  child: IconButton(
+                      alignment: Alignment.center,
+                      icon: FaIcon(FontAwesomeIcons.user),
+                      color: pressed ? Colors.blue : Colors.black,
+                      onPressed: () {
+                        setState(() {
+                          if (pressed) {
+                            pressed = false;
+                          } else {
+                            pressed = true;
+                          }
+                          cat = "personal/other";
+                        });
+                      }))),
+        ],
+      )
+    ]);
   }
 
   Widget budgetText() {
@@ -251,7 +416,7 @@ class _MyWidgetState extends State<MyWidget> {
     );
   }
 
-  addBudgetToSF() async {
+  addBudgetToSP() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       prefs.setDouble('total', budget);
@@ -267,137 +432,80 @@ class _MyWidgetState extends State<MyWidget> {
   }
 }
 
-mixin Alignmnent {
-}
-
-class DataPage extends StatefulWidget {
+class HistoryPage extends StatefulWidget {
   @override
-  _DataPageState createState() => _DataPageState();
+  _HistoryPageState createState() {
+    return _HistoryPageState();
+  }
 }
 
-class _DataPageState extends State<DataPage> {
-
+class _HistoryPageState extends State<HistoryPage> {
   Future<List<TransactionClass>> allTransactions;
   var dbHelper;
 
   @override
-  void initState(){
+  void initState() {
     super.initState();
     dbHelper = DBHelper();
     refreshList();
   }
 
   refreshList() {
-    setState((){
+    setState(() {
       allTransactions = dbHelper.getTransactions();
     });
   }
 
-  SingleChildScrollView dataTable(List <TransactionClass> transactions){
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: <Widget>[
+        CupertinoSliverNavigationBar(
+          largeTitle: Text('history'),
+        ),
+        SliverSafeArea(
+            top: false,
+            minimum: const EdgeInsets.only(top: 8),
+            sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+              (BuildContext context, int index) {
+                return list();
+              },
+              childCount: 1,
+            ))),
+      ],
+    );
+  }
+
+  SingleChildScrollView dataTable(List<TransactionClass> transactions) {
     return SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      child: DataTable(
-        columns: [
-          DataColumn(
-            label: Text('Category')
-          ),
-          DataColumn(
-            label: Text('Amount')
-          ),
-        ],
-        rows: transactions
-          .map(
-            (transaction) => DataRow( cells: 
-                      [
-                        DataCell(
-                          Text(transaction.category)
-                        ),
-                        DataCell(
-                          Text(transaction.val.toString())
-                        ),
-                      ]
-            )
-          ).toList()
-        ,
-      )
-    );
+        scrollDirection: Axis.vertical,
+        child: DataTable(
+          columns: [
+            DataColumn(label: Text('Category')),
+            DataColumn(label: Text('Amount')),
+          ],
+          rows: transactions
+              .map((transaction) => DataRow(cells: [
+                    DataCell(Text(transaction.category)),
+                    DataCell(Text(transaction.val.toString())),
+                  ]))
+              .toList(),
+        ));
   }
 
-  list(){
-    return Expanded(
-      child: FutureBuilder(
-        future: allTransactions,
-        builder: (context, snapshot){
-          
-          if (null == snapshot.data || snapshot.data.length == 0){
-            return Text('No Transactions');
-          }
-
-          else if(snapshot.hasData){
-            return dataTable(snapshot.data);
-
-            }
-          return CircularProgressIndicator();
-          }
-        ),
-    );
-  }
-
-
-
-  @override
-  Widget build(BuildContext context) {
-
-    return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        verticalDirection: VerticalDirection.down,
-        children: <Widget>[list()],
-      );
-  }
-}
-
-
-
-class BothPages extends StatefulWidget {
-  @override
-  _BothPagesState createState() => _BothPagesState();
-}
-
-class _BothPagesState extends State<BothPages> {
-  int _currentPage = 0;
-
-  static List<Widget> _bothPages = <Widget>[
-    MyWidget(),
-    DataPage(),
-  ];
-
-  void _onItemTapped(int index){
-    setState(() {
-      _currentPage = index;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    //369 MaterialApp is new line maybe bad lol
-    return Scaffold(
-      body: _bothPages[_currentPage],
-      bottomNavigationBar: BottomNavigationBar(
-        items: [
-          new BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: "Main"
-          ),
-          new BottomNavigationBarItem(
-            icon: Icon(Icons.history),
-            label: "History"
-          ),
-        ],
-        currentIndex: _currentPage,
-        selectedItemColor: Colors.black,
-        onTap: _onItemTapped,
-        ),
-    );
+  list() {
+    return Material(
+        color: Colors.white,
+        child: FutureBuilder(
+            future: allTransactions,
+            builder: (context, snapshot) {
+              if (null == snapshot.data || snapshot.data.length == 0) {
+                return Text('No Transactions');
+              } else if (snapshot.hasData) {
+                return dataTable(snapshot.data);
+              }
+              return CircularProgressIndicator();
+            }));
   }
 }
