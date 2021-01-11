@@ -29,7 +29,8 @@ class DBHelper {
   }
 
   _onCreate(Database db, int version) async {
-    await db.execute("CREATE TABLE $TABLE ($ID INTEGER PRIMARY KEY, $CATEGORY TEXT, $VAL REAL)");
+    await db.execute(
+        "CREATE TABLE $TABLE ($ID INTEGER PRIMARY KEY, $CATEGORY TEXT, $VAL REAL)");
   }
 
   Future<TransactionClass> save(TransactionClass transaction) async {
@@ -58,8 +59,8 @@ class DBHelper {
 
   Future<int> update(TransactionClass em) async {
     var dbClient = await db;
-    return await dbClient.update(TABLE, em.toMap(),
-        where: '$ID = ?', whereArgs: [em.id]);
+    return await dbClient
+        .update(TABLE, em.toMap(), where: '$ID = ?', whereArgs: [em.id]);
   }
 
   Future close() async {
@@ -67,7 +68,7 @@ class DBHelper {
     dbClient.close();
   }
 
-  Future deleteAll() async{
+  Future deleteAll() async {
     var dbClient = await db;
     dbClient.delete('$TABLE');
   }
