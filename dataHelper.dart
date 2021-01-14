@@ -10,6 +10,7 @@ class DBHelper {
   static const String ID = 'id';
   static const String VAL = 'val';
   static const String CATEGORY = 'category';
+  static const String TIME = 'time';
   static const String TABLE = 'Transaction_table';
   static const String DB_NAME = 'transaction1.db';
 
@@ -28,9 +29,35 @@ class DBHelper {
     return db;
   }
 
+  Future<int> getCount() async {
+    var dbClient = await db;
+    var x = await dbClient.rawQuery('SELECT COUNT(*) FROM $TABLE');
+    int count = Sqflite.firstIntValue(x);
+    return count;
+  }
+
+  //Future<double> getSingle(int id) async{
+  //var dbClient = await db;
+  //var transactionInfo;
+  //transactionInfo = await dbClient.rawQuery('SELECT VAL FROM $TABLE WHERE $ID = $id');
+
+  //return transactionInfo;
+  //}
+
+  Future<TransactionClass> getSingleTransaction(int id) async {
+    var dbClient = await db;
+    List<Map> maps = await dbClient.query(TABLE,
+        columns: [CATEGORY, VAL, TIME], where: "id = ?", whereArgs: [id]);
+    if (maps.length > 0) {
+      return new TransactionClass.fromMap(maps.first);
+    }
+
+    return null;
+  }
+
   _onCreate(Database db, int version) async {
     await db.execute(
-        "CREATE TABLE $TABLE ($ID INTEGER PRIMARY KEY, $CATEGORY TEXT, $VAL REAL)");
+        "CREATE TABLE $TABLE ($ID INTEGER PRIMARY KEY, $CATEGORY TEXT, $VAL REAL, $TIME TEXT)");
   }
 
   Future<TransactionClass> save(TransactionClass transaction) async {
@@ -41,7 +68,8 @@ class DBHelper {
 
   Future<List<TransactionClass>> getTransactions() async {
     var dbClient = await db;
-    List<Map> maps = await dbClient.query(TABLE, columns: [ID, CATEGORY, VAL]);
+    List<Map> maps =
+        await dbClient.query(TABLE, columns: [ID, CATEGORY, VAL, TIME]);
     //List<Map> maps = await dbClient.rawQuery("SELECT * FROM $TABLE");
     List<TransactionClass> em = [];
     if (maps.length > 0) {
@@ -50,6 +78,13 @@ class DBHelper {
       }
     }
     return em;
+  }
+
+  Future<double> totalSpent() async {
+    var dbClient = await db;
+    var total = await dbClient.rawQuery("SELECT SUM($VAL) FROM $TABLE");
+    double tot = total[0]["SUM($VAL)"] as double;
+    return tot;
   }
 
   Future<int> delete(int id) async {

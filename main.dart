@@ -8,6 +8,7 @@ import 'dataHelper.dart';
 import 'transactionCLASS.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'CustomWidgets.dart';
+import 'package:intl/intl.dart';
 
 void main() => runApp(BuddyApp());
 
@@ -51,24 +52,19 @@ class _HomePageState extends State<HomePage>
   int spot = 0;
   var dbHelper;
   Future<List<TransactionClass>> allTransactions;
+  Future<List<Widget>> allTransactionMedia;
   String name;
   String cat;
-  var popup;
+  DateFormat formatter = DateFormat('M-d-y');
 
   @override
   void initState() {
     super.initState();
-    controller =
-        AnimationController(vsync: this, duration: Duration(milliseconds: 450));
-    scaleAnimation =
-        CurvedAnimation(parent: controller, curve: Curves.elasticInOut);
-    controller.addListener(() {
-      setState(() {});
-    });
-    controller.forward();
+    loadSpot();
     loadBudget();
     dbHelper = DBHelper();
-    popup = PopupDialog();
+    allTransactionMedia = createTransactionList();
+    refreshList();
   }
 
   loadBudget() async {
@@ -78,34 +74,101 @@ class _HomePageState extends State<HomePage>
     });
   }
 
-  refreshList() {
+  loadSpot() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      spot = (prefs.getInt('spot') ?? 0);
+    });
+  }
+
+  refreshList() async {
     setState(() {
       allTransactions = dbHelper.getTransactions();
+      allTransactionMedia = createTransactionList();
     });
+  }
+
+  Future<List<Widget>> createTransactionList() async {
+    int count = await dbHelper.getCount();
+
+    List<Widget> allMediaListItems = [];
+    for (int i = count - 1; i >= 0; i--) {
+      Widget singleMediaListItem;
+      var c;
+      c = await dbHelper.getSingleTransaction(i);
+
+      String currVal = '\$' + c.val.toStringAsFixed(2);
+      if (c.val < 0) {
+        currVal = '-\$' + (-c.val).toStringAsFixed(2);
+      }
+      String cCat = c.category;
+      String time = c.time;
+      singleMediaListItem = _mediaListItem(currVal + '   ' + cCat,
+          Colors.amber[500], Colors.amber[100], time, icons(cCat));
+      allMediaListItems.add(singleMediaListItem);
+    }
+    return allMediaListItems;
+  }
+
+  Widget floatingButtons() {
+    return Column(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        Align(
+            alignment: Alignment.bottomRight,
+            child: FloatingActionButton(
+              heroTag: null,
+              child: CircleAvatar(
+                radius: 7.8 * Responsive.widthMultiplier,
+                backgroundColor: Colors.red[200],
+                child: FaIcon(
+                  FontAwesomeIcons.minus,
+                  color: Colors.white,
+                ),
+              ),
+              onPressed: () {
+                showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return expensePopup();
+                    });
+              },
+            )),
+        Align(
+            alignment: Alignment.bottomRight,
+            child: Container(
+              height: 10,
+            )),
+        Align(
+            alignment: Alignment.bottomRight,
+            child: FloatingActionButton(
+              heroTag: null,
+              child: CircleAvatar(
+                radius: 7.8 * Responsive.widthMultiplier,
+                backgroundColor: Color(0xFF63cb99),
+                child: FaIcon(
+                  FontAwesomeIcons.plus,
+                  color: Colors.white,
+                ),
+              ),
+              onPressed: () {
+                showModalBottomSheet(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return addPopup();
+                    });
+              },
+            )),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: CircleAvatar(
-        radius: 7.8 * Responsive.widthMultiplier,
-        backgroundColor: Color(0xFF63cb99),
-        child: GestureDetector(
-          onTap: () {
-            showDialog(
-              context: context,
-              builder: (
-                BuildContext context,
-              ) =>
-                  expensePopup(),
-            );
-          },
-          child: Icon(
-            Icons.add,
-            color: Colors.white,
-          ),
-        ),
-      ),
+      resizeToAvoidBottomPadding: false,
+      floatingActionButton: floatingButtons(),
       appBar: AppBar(
         backgroundColor: Color(0xFF2c2c3c),
         leading: Padding(
@@ -139,13 +202,11 @@ class _HomePageState extends State<HomePage>
                   color: Colors.grey[500],
                 ),
                 onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (
-                      BuildContext context,
-                    ) =>
-                        resetPopup(),
-                  );
+                  showModalBottomSheet(
+                      context: context,
+                      builder: (BuildContext context) {
+                        return resetPopup();
+                      });
                 }),
           ),
         ],
@@ -195,13 +256,7 @@ class _HomePageState extends State<HomePage>
                   ),
                   child: Row(
                     children: <Widget>[
-                      Text(
-                        "\$" + budget.toStringAsFixed(2),
-                        style: TextStyle(
-                          fontSize: 7.6 * Responsive.textMultiplier,
-                          color: Colors.white,
-                        ),
-                      ),
+                      budgetText(),
                       Expanded(
                         child: Container(
                           width: 0.57 * MediaQuery.of(context).size.width,
@@ -222,13 +277,33 @@ class _HomePageState extends State<HomePage>
                                       ),
                                     ),
                                     Spacer(),
-                                    Expanded(
-                                      child: Text(
-                                        "\$" + "0.00",
-                                        style:
-                                            TextStyle(color: Colors.grey[600]),
-                                      ),
-                                    ),
+                                    FutureBuilder(
+                                        future: spent(),
+                                        builder: (context, snapshot) {
+                                          if (!snapshot.hasData) {
+                                            return Text(
+                                              "\$0.00",
+                                              style: TextStyle(
+                                                  color: Colors.grey[600]),
+                                            );
+                                          }
+                                          if (snapshot.connectionState ==
+                                              ConnectionState.done) {
+                                            String spent = snapshot.data
+                                                .toStringAsFixed(2);
+                                            return Text(
+                                              "\$" + spent,
+                                              style: TextStyle(
+                                                  color: Colors.grey[600]),
+                                            );
+                                          } else {
+                                            return Text(
+                                              "\$0.00",
+                                              style: TextStyle(
+                                                  color: Colors.grey[600]),
+                                            );
+                                          }
+                                        }),
                                   ],
                                 ),
                               ),
@@ -247,12 +322,9 @@ class _HomePageState extends State<HomePage>
                                       ),
                                     ),
                                     Spacer(),
-                                    Expanded(
-                                      child: Text(
-                                        "spent",
-                                        style:
-                                            TextStyle(color: Colors.grey[600]),
-                                      ),
+                                    Text(
+                                      "spent",
+                                      style: TextStyle(color: Colors.grey[600]),
                                     ),
                                   ],
                                 ),
@@ -271,13 +343,44 @@ class _HomePageState extends State<HomePage>
                     top: 10 * Responsive.imageSizeMultiplier,
                   ),
                   child: Center(
-                    child: LinearPercentIndicator(
-                      width: 0.87 * MediaQuery.of(context).size.width,
-                      lineHeight: 8.0,
-                      percent: 0.2,
-                      progressColor: Colors.greenAccent,
-                      backgroundColor: Colors.grey[700],
-                    ),
+                    child: FutureBuilder(
+                        future: spent(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return LinearPercentIndicator(
+                              width: 0.87 * MediaQuery.of(context).size.width,
+                              lineHeight: 8.0,
+                              percent: 0.0,
+                              progressColor: Colors.greenAccent,
+                              backgroundColor: Colors.grey[700],
+                            );
+                          }
+                          if (snapshot.connectionState ==
+                              ConnectionState.done) {
+                            double spent = snapshot.data;
+                            double perc = -spent / (-spent + budget);
+                            if (perc > 1.0) {
+                              perc = 1.0;
+                            } else if (perc < 0.0) {
+                              perc = 0.0;
+                            }
+                            return LinearPercentIndicator(
+                              width: 0.87 * MediaQuery.of(context).size.width,
+                              lineHeight: 8.0,
+                              percent: perc,
+                              progressColor: Colors.greenAccent,
+                              backgroundColor: Colors.grey[700],
+                            );
+                          } else {
+                            return LinearPercentIndicator(
+                              width: 0.87 * MediaQuery.of(context).size.width,
+                              lineHeight: 8.0,
+                              percent: 0.0,
+                              progressColor: Colors.greenAccent,
+                              backgroundColor: Colors.grey[700],
+                            );
+                          }
+                        }),
                   ),
                 ),
               ],
@@ -299,6 +402,7 @@ class _HomePageState extends State<HomePage>
                   "previous transactions",
                   style: TextStyle(
                     fontSize: 3.4 * Responsive.textMultiplier,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
                 Spacer(),
@@ -312,128 +416,148 @@ class _HomePageState extends State<HomePage>
               ],
             ),
           ),
-          Column(
-            children: <Widget>[
-              _mediaListItem(
-                  "Podcast with Brenda Evans",
-                  Colors.amber[500],
-                  Colors.amber[100],
-                  "32Mb March 14, 2021",
-                  Icons.library_music),
-              _mediaListItem("Student Movies for March", Colors.amber[500],
-                  Colors.amber[100], "894Mb March 8, 2021", Icons.videocam),
-              _mediaListItem("Childhood", Colors.amber[500], Colors.amber[100],
-                  "13.4Gb March 8, 2021", Icons.videocam),
-              _mediaListItem(
-                "Podcast with Larry Taylor",
-                Colors.amber[500],
-                Colors.amber[100],
-                "49Mb February 25, 2021",
-                Icons.library_music,
-              ),
-              _mediaListItem(
-                  "Video Blog Youtube",
-                  Colors.amber[500],
-                  Colors.amber[100],
-                  "13.4Gb February 11, 2021",
-                  Icons.videocam),
-              _mediaListItem(
-                "Podcast with Katherine Long",
-                Colors.amber[500],
-                Colors.amber[100],
-                "72Mb February 11 ,2021",
-                Icons.library_music,
-              ),
-            ],
-          ),
+          FutureBuilder(
+              future: allTransactionMedia,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return Column(children: snapshot.data);
+                } else {
+                  return LinearProgressIndicator();
+                }
+              }),
         ],
       ),
     );
   }
 
   Widget expensePopup() {
-    return Center(
-        child: Material(
-            color: Colors.transparent,
-            child: ScaleTransition(
-                scale: scaleAnimation,
-                child: Padding(
-                    padding: const EdgeInsets.all(50.0),
-                    child: Container(
-                        decoration: ShapeDecoration(
-                            color: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15.0))),
-                        child: Container(
-                            child: Padding(
-                                padding: const EdgeInsets.all(20.0),
-                                child: Column(children: [
-                                  CupertinoTextField(
-                                    textAlign: TextAlign.center,
-                                    keyboardType: TextInputType.number,
-                                    controller: _c,
-                                  ),
-                                  categories(),
-                                  CupertinoButton.filled(
-                                      child: new Text("enter"),
-                                      onPressed: () {
-                                        double change = -double.parse(_c.text);
-                                        if (cat == null) {
-                                          cat = 'other';
-                                        }
-                                        TransactionClass t =
-                                            TransactionClass(null, cat, change);
-                                        dbHelper.save(t);
-                                        refreshList();
-                                        setState(() {
-                                          budget = budget + change;
-                                          addBudgetToSP();
-                                        });
-                                        Navigator.of(context,
-                                                rootNavigator: true)
-                                            .pop();
-                                        _c.clear();
-                                      }),
-                                ]))))))));
+    return Container(
+        height: 400,
+        color: Colors.white,
+        child: Center(
+            child: Column(children: [
+          CupertinoTextField(
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            controller: _c,
+          ),
+          categories(),
+          CupertinoButton.filled(
+              child: new Text("enter"),
+              onPressed: () {
+                double change = -double.parse(_c.text);
+                DateTime now = DateTime.now();
+                String formattedTime = formatter.format(now);
+                if (cat == null) {
+                  cat = 'other';
+                }
+                TransactionClass t =
+                    TransactionClass(spot, cat, change, formattedTime);
+                dbHelper.save(t);
+                refreshList();
+                setState(() {
+                  budget = budget + change;
+                  addBudgetToSP();
+                  spot += 1;
+                  updateSpot();
+                });
+                Navigator.of(context, rootNavigator: true).pop();
+                _c.clear();
+              }),
+        ])));
+  }
+
+  Widget budgetText() {
+    if (budget < 0) {
+      return Text(
+        "-\$" + (-budget).toStringAsFixed(2),
+        style: TextStyle(
+          fontSize: 7.6 * Responsive.textMultiplier,
+          color: Colors.white,
+        ),
+      );
+    } else {
+      return Text(
+        "\$" + budget.toStringAsFixed(2),
+        style: TextStyle(
+          fontSize: 7.6 * Responsive.textMultiplier,
+          color: Colors.white,
+        ),
+      );
+    }
+  }
+
+  Widget addPopup() {
+    return Container(
+        height: 400,
+        color: Colors.white,
+        child: Center(
+            child: Column(children: [
+          CupertinoTextField(
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            controller: _c,
+          ),
+          categories(),
+          CupertinoButton.filled(
+              child: new Text("enter"),
+              onPressed: () {
+                double change = double.parse(_c.text);
+                DateTime now = DateTime.now();
+                String formattedTime = formatter.format(now);
+                if (cat == null) {
+                  cat = 'other';
+                }
+                TransactionClass t =
+                    TransactionClass(spot, cat, change, formattedTime);
+                dbHelper.save(t);
+                refreshList();
+                setState(() {
+                  budget = budget + change;
+                  addBudgetToSP();
+                  spot += 1;
+                  updateSpot();
+                });
+                Navigator.of(context, rootNavigator: true).pop();
+                _c.clear();
+              }),
+        ])));
   }
 
   Widget resetPopup() {
-    return Center(
-        child: Material(
-            color: Colors.transparent,
-            child: ScaleTransition(
-                scale: scaleAnimation,
-                child: Padding(
-                    padding: const EdgeInsets.all(50.0),
-                    child: Container(
-                        decoration: ShapeDecoration(
-                            color: Colors.white,
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15.0))),
-                        child: Container(
-                            child: Padding(
-                                padding: const EdgeInsets.all(20.0),
-                                child: Column(children: [
-                                  CupertinoTextField(
-                                    textAlign: TextAlign.center,
-                                    keyboardType: TextInputType.number,
-                                    controller: _c,
-                                  ),
-                                  CupertinoButton.filled(
-                                      child: new Text("enter"),
-                                      onPressed: () {
-                                        dbHelper.deleteAll();
-                                        refreshList();
-                                        setState(() {
-                                          budget = double.parse(_c.text);
-                                          addBudgetToSP();
-                                        });
-                                        Navigator.of(context,
-                                                rootNavigator: true)
-                                            .pop();
-                                        _c.clear();
-                                      }),
-                                ]))))))));
+    return Container(
+        height: 400,
+        color: Colors.white,
+        child: Center(
+            child: Column(children: [
+          CupertinoTextField(
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            controller: _c,
+          ),
+          CupertinoButton.filled(
+              child: new Text("enter"),
+              onPressed: () {
+                dbHelper.deleteAll();
+                refreshList();
+                setState(() {
+                  budget = double.parse(_c.text);
+                  addBudgetToSP();
+                  spot = 0;
+                  updateSpot();
+                });
+                Navigator.of(context, rootNavigator: true).pop();
+                _c.clear();
+              }),
+        ])));
+  }
+
+  updateSpot() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      prefs.setInt('spot', spot);
+      spot = (prefs.getInt('spot') ?? 0);
+    });
   }
 
   addBudgetToSP() async {
@@ -566,6 +690,26 @@ class _HomePageState extends State<HomePage>
     ]);
   }
 
+  Future<double> spent() async {
+    return await dbHelper.totalSpent();
+  }
+
+  icons(String cat) {
+    if (cat == ('food/drinks')) {
+      return FontAwesomeIcons.utensils;
+    } else if (cat == ('groceries')) {
+      return FontAwesomeIcons.shoppingBasket;
+    } else if (cat == ('clothing')) {
+      return FontAwesomeIcons.tshirt;
+    } else if (cat == ('bills')) {
+      return FontAwesomeIcons.fileInvoiceDollar;
+    } else if (cat == ('health')) {
+      return FontAwesomeIcons.firstAid;
+    } else {
+      return FontAwesomeIcons.user;
+    }
+  }
+
   Widget _mediaListItem(
       String title, Color icon, Color accent, String meta, IconData mediaIcon) {
     return Padding(
@@ -579,7 +723,7 @@ class _HomePageState extends State<HomePage>
             child: Container(
               decoration: BoxDecoration(
                 color: accent,
-                borderRadius: BorderRadius.circular(6.8),
+                borderRadius: BorderRadius.circular(50),
               ),
               child: Padding(
                 padding: EdgeInsets.all(3 * Responsive.imageSizeMultiplier),
@@ -599,7 +743,7 @@ class _HomePageState extends State<HomePage>
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 2.3 * Responsive.textMultiplier,
+                    fontSize: 3 * Responsive.textMultiplier,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey[600],
                   ),
@@ -611,7 +755,7 @@ class _HomePageState extends State<HomePage>
                   meta,
                   style: TextStyle(
                     fontWeight: FontWeight.w400,
-                    fontSize: 1.8 * Responsive.textMultiplier,
+                    fontSize: 2 * Responsive.textMultiplier,
                     color: Colors.grey[500],
                   ),
                 ),
